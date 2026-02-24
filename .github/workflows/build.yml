@@ -45,7 +45,7 @@ jobs:
       
            sdkmanager "platforms;android-34"
            sdkmanager "build-tools;34.0.0" 
-           sudo apt-get install -y aidl
+           
 
 
            
@@ -109,7 +109,13 @@ jobs:
            mkdir -p /home/runner/.buildozer/android/platform/android-sdk/tools/bin
            ln -sf $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
            ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
-           
+
+
+        - name: Ensure Android Build Tools and AIDL are installed
+          run: |
+           yes | sdkmanager --licenses
+           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+           export PATH=$HOME/android-sdk/build-tools/34.0.0:$PATH
            
         - name: Build with Buildozer
           run: buildozer android debug
