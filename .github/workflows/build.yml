@@ -44,11 +44,7 @@ jobs:
            sdkmanager "platform-tools"
       
            sdkmanager "platforms;android-34"
-           sdkmanager "build-tools;34.0.0" 
-           
-
-
-           
+           sdkmanager "build-tools;34.0.0"   
         - name: Install AIDL dependencies
           run: |
             sudo apt-get update
