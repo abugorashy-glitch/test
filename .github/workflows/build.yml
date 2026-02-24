@@ -103,10 +103,11 @@ jobs:
            buildozer init
            fi
           
-        - name: Ensure build-tools path compatibility
+        - name: Symlink sdkmanager for Buildozer
           run: |
-           mkdir -p /home/runner/.buildozer/android/platform/android-sdk
-           ln -sf $HOME/android-sdk/build-tools /home/runner/.buildozer/android/platform/android-sdk/build-tools  
+           mkdir -p /home/runner/.buildozer/android/platform/android-sdk/tools/bin
+           ln -sf $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+           ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
            
         - name: Build with Buildozer
           run: buildozer android debug
