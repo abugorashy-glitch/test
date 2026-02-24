@@ -109,6 +109,8 @@ jobs:
            mkdir -p /home/runner/.buildozer/android/platform/android-sdk/tools/bin
            ln -sf $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
            ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
+           mkdir -p /home/runner/.buildozer/android/platform/android-sdk/build-tools
+           cp -r $HOME/android-sdk/build-tools/* /home/runner/.buildozer/android/platform/android-sdk/build-tools/
            
         - name: Build with Buildozer
           run: buildozer android debug
