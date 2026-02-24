@@ -3,140 +3,96 @@ name: Build Kivy APK
 on: [push]
 
 jobs:
-      build:
-        runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-        steps:
+    steps:
 
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.9' # Or your desired Python version
-        - name: Install Cython
-          run: pip install cython
-        - name: Install dependencies
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y libtinfo6
-            sudo ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
-    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
 
+    - name: Install Cython
+      run: pip install cython
 
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libtinfo6
+        sudo ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
 
+    - name: Install Android SDK commandline tools
+      run: |
+        ANDROID_SDK_ROOT=$HOME/android-sdk
+        mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+        curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
+        unzip -q cmdtools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+        mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
 
+    - name: Install required Android platforms and build tools
+      run: |
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools"
+        sdkmanager "platforms;android-34"
+        sdkmanager "build-tools;34.0.0"
 
+    - name: Ensure Android Build Tools and AIDL are installed and accessible
+      run: |
+        mkdir -p /home/runner/.buildozer/android/platform/android-sdk/
+        # Symlink the build-tools directory so Buildozer can find AIDL
+        ln -sf $HOME/android-sdk/build-tools /home/runner/.buildozer/android/platform/android-sdk/build-tools
+        # Optionally, symlink platform-tools too
+        ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
+        # Check that AIDL exists for confirmation/debug
+        ls -l $HOME/android-sdk/build-tools/34.0.0/aidl || (echo "aidl not found!" && exit 1)
 
-        - name: Install Android SDK commandline tools
-          run: |
-           ANDROID_SDK_ROOT=$HOME/android-sdk
-           mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-           curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
-           unzip -q cmdtools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-           mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-           echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
-           echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+    - name: Install AIDL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libstdc++6 aidl
 
-        - name: Install required Android platforms and build tools
-          run: |
-           yes | sdkmanager --licenses
-           sdkmanager "platform-tools"
-      
-           sdkmanager "platforms;android-34"
-           sdkmanager "build-tools;34.0.0"   
-        - name: Install AIDL dependencies
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y build-essential libstdc++6 aidl
-            # below command is related to the above command
-        - name: Install specific Android SDK build-tools (if needed)
-          run: sdkmanager "build-tools;34.0.0" # Replace with your required version
+    - name: Set JAVA_HOME
+      run: echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> $GITHUB_ENV
 
-          #below command is related to the above command
-        - name: Set JAVA_HOME
-          run: export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64 # Adjust path as needed
+    - name: Install Buildozer and dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libssl-dev build-essential patch libffi-dev python3-dev python3-pip
+        pip install buildozer
 
-          #below cmmand is related to above command
-        - name: Install libstdc++6
-          run: |
-           sudo apt-get update
-           sudo apt-get install -y libstdc++6
-         
+    - name: Generate buildozer.spec if missing
+      run: |
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+        fi
 
-        - name: Install Buildozer and dependencies
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libssl-dev build-essential patch libffi-dev python3-dev python3-pip
-                            pip install buildozer
-        - name: Create build-tools directory
-          run: mkdir -p /home/runner/android-sdk/build-tools
-        - name: Install Android Build Tools
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y wget unzip
-            wget https://dl.google.com/android/repository/build-tools_r33.0.2-linux.zip
-            unzip build-tools_r33.0.2-linux.zip -d $HOME/android-sdk/build-tools
-            export PATH=$HOME/android-sdk/build-tools/33.0.0:$PATH
-        - name: Set up working directory
-          run: cd ${{ github.workspace }}
+    - name: Build with Buildozer
+      run: buildozer android debug
 
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
 
+    - name: Build APK
+      run: ./gradlew :app:assembleDebug --no-daemon --info --stacktrace
 
+    - name: Show produced APKs
+      run: |
+        echo "== find .apk files =="
+        find . -type f -name "*.apk" -print || true
+        echo "== app build outputs =="
+        ls -la app/build/outputs || true
+        ls -la app/build/outputs/apk || true
+        if [ -d "app/build/outputs/apk/debug" ]; then ls -la app/build/outputs/apk/debug || true; fi
 
-        
-
-
-        
-
-
-
-
-
-
-        - name: Generate buildozer.spec if missing
-          run: |
-           if [ ! -f buildozer.spec ]; then
-           buildozer init
-           fi
-          
-        - name: Symlink sdkmanager for Buildozer
-          run: |
-           mkdir -p /home/runner/.buildozer/android/platform/android-sdk/tools/bin
-           ln -sf $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager /home/runner/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-           ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
-
-
-        - name: Ensure Android Build Tools and AIDL are installed
-          run: |
-           yes | sdkmanager --licenses
-           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-           export PATH=$HOME/android-sdk/build-tools/34.0.0:$PATH
-           
-        - name: Build with Buildozer
-          run: buildozer android debug
-         
-          
-
-        - name: Make gradlew executable
-          run: chmod +x ./gradlew
-
-        - name: Build APK
-          run: ./gradlew :app:assembleDebug --no-daemon --info --stacktrace
-
-        - name: Show produced APKs
-          run: |
-           echo "== find .apk files =="
-           find . -type f -name "*.apk" -print || true
-           echo "== app build outputs =="
-           ls -la app/build/outputs || true
-           ls -la app/build/outputs/apk || true
-           if [ -d "app/build/outputs/apk/debug" ]; then ls -la app/build/outputs/apk/debug || true; fi
-
-        - name: Upload APK(s)
-          uses: actions/upload-artifact@v4
-          with:
-           name: app-apks
-           path: |
-            app/build/outputs/**/*.apk
-            **/build/outputs/**/*.apk
+    - name: Upload APK(s)
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-apks
+        path: |
+          app/build/outputs/**/*.apk
+          **/build/outputs/**/*.apk
