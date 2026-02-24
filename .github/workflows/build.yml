@@ -103,7 +103,11 @@ jobs:
            buildozer init
            fi
           
-          
+        - name: Ensure build-tools path compatibility
+          run: |
+           mkdir -p /home/runner/.buildozer/android/platform/android-sdk
+           ln -sf $HOME/android-sdk/build-tools /home/runner/.buildozer/android/platform/android-sdk/build-tools  
+           
         - name: Build with Buildozer
           run: buildozer android debug
          
