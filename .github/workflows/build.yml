@@ -1,98 +1,33 @@
-name: Build Kivy APK
-
-on: [push]
+name: Build Kivy iOS App
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-ios:
+    runs-on: macos-14 # macOS runner required for Xcode
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Install Cython
-      run: pip install cython
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake libtool pkg-config
+          pip install Cython==3.0.11 buildozer
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libtinfo6
-        sudo ln -s /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+      - name: Decode Secrets
+        run: |
+          echo "$IOS_DISTRIBUTION_CERTIFICATE" | base64 --decode > ios_distribution.cer
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > app.mobileprovision
 
-    - name: Install Android SDK commandline tools
-      run: |
-        ANDROID_SDK_ROOT=$HOME/android-sdk
-        mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-        curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
-        unzip -q cmdtools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-        mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-        ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest" "$ANDROID_SDK_ROOT/tools"
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        
-
-    - name: Install required Android platforms and build tools
-      run: |
-        yes | sdkmanager --licenses
-        sdkmanager "platform-tools"
-        sdkmanager "platforms;android-34"
-        sdkmanager "build-tools;34.0.0"
-
-    - name: Ensure Android Build Tools and AIDL are installed and accessible
-      run: |
-        mkdir -p /home/runner/.buildozer/android/platform/android-sdk/
-        # Symlink the build-tools directory so Buildozer can find AIDL
-        ln -sf $HOME/android-sdk/build-tools /home/runner/.buildozer/android/platform/android-sdk/build-tools
-        # Optionally, symlink platform-tools too
-        ln -sf $HOME/android-sdk/platform-tools /home/runner/.buildozer/android/platform/android-sdk/platform-tools
-        # Check that AIDL exists for confirmation/debug
-        ls -l $HOME/android-sdk/build-tools/34.0.0/aidl || (echo "aidl not found!" && exit 1)
-
-    - name: Install AIDL dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libstdc++6 aidl
-
-    - name: Set JAVA_HOME
-      run: echo "JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64" >> $GITHUB_ENV
-
-    - name: Install Buildozer and dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libssl-dev build-essential patch libffi-dev python3-dev python3-pip
-        pip install buildozer
-
-    - name: Generate buildozer.spec if missing
-      run: |
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
-
-    - name: Build with Buildozer
-      run: buildozer android debug
-
-    - name: Make gradlew executable
-      run: chmod +x ./gradlew
-
-    - name: Build APK
-      run: ./gradlew :app:assembleDebug --no-daemon --info --stacktrace
-
-    - name: Show produced APKs
-      run: |
-        echo "== find .apk files =="
-        find . -type f -name "*.apk" -print || true
-        echo "== app build outputs =="
-        ls -la app/build/outputs || true
-        ls -la app/build/outputs/apk || true
-        if [ -d "app/build/outputs/apk/debug" ]; then ls -la app/build/outputs/apk/debug || true; fi
-
-    - name: Upload APK(s)
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-apks
-        path: |
-          app/build/outputs/**/*.apk
-          **/build/outputs/**/*.apk
+      - name: Build with Buildozer
+        env:
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          buildozer ios debug
