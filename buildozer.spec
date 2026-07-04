@@ -72,7 +72,13 @@ ios.codesign.identity = "iPhone Developer"
 
 # (str) Path to the provisioning profile (Alternatively handled by Github Secrets)
 #ios.codesign.development = "path/to/development.mobileprovision"
-#ios.codesign.allowed_to_sign_in_parallel = false
+
+# (bool) Whether or not to sign the code via buildozer toolchain
+ios.codesign.allowed = false
+
+# (bool) Allow signing processes to happen in parallel
+ios.codesign.allowed_to_sign_in_parallel = false
+
 
 # (list) List of frameworks to link against
 #ios.frameworks = SystemConfiguration,Security
